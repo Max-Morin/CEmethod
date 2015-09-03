@@ -10,11 +10,11 @@ class CEWorker extends Thread {
 	/**
 	 * Queue for receiving problems.
 	 */
-	private final LinkedBlockingQueue<Subproblem> q;
+	private final LinkedBlockingQueue<Subproblem> problemQueue;
 	/**
 	 * Queue for returning results.
 	 */
-	private final LinkedBlockingQueue<Perf> qq;
+	private final LinkedBlockingQueue<Perf> resultQueue;
 
 	/**
 	 * @param input input queue.
@@ -22,8 +22,8 @@ class CEWorker extends Thread {
 	 */
 	CEWorker(LinkedBlockingQueue<Subproblem> input, LinkedBlockingQueue<Perf> output) {
 		super();
-		q = input;
-		qq = output;
+		problemQueue = input;
+		resultQueue = output;
 	}
 
 	/**
@@ -42,7 +42,7 @@ class CEWorker extends Thread {
 	private void doone() {
 		Subproblem prob;
 		try {
-			prob = q.take();
+			prob = problemQueue.take();
 		} catch(InterruptedException e) {
 			interrupt();
 			return;
@@ -51,7 +51,7 @@ class CEWorker extends Thread {
 		perf.index = prob.index;
 		perf.performance = prob.problem.fitness(prob.parameters);
 		try {
-			qq.put(perf);
+			resultQueue.put(perf);
 		} catch(InterruptedException e) {
 			interrupt();
 			throw new RuntimeException("Thread interrupted while working.");

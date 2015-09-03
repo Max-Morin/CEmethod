@@ -5,7 +5,7 @@ package cemethod;
  * with the cross-entropy method. Note:
  * <b>All functions must be thread-safe.</b>
  */
-public interface CEProblem {
+public interface Function {
 	/**
 	 * @return The dimension of the problem space.
 	 */
@@ -13,7 +13,7 @@ public interface CEProblem {
 
 	/**
 	 * This function may not mutate v.
-	 * @param v parameter vector to evaluate, of length dimension().
+	 * @param v vector to evaluate, of length dimension().
 	 * @return The value of the function at v.
 	 */
 	double fitness(double[] v);

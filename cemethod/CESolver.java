@@ -1,7 +1,6 @@
 package cemethod;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -16,19 +15,15 @@ public final class CESolver {
 	/**
 	 * Queue to send problems to workers.
 	 */
-	private final LinkedBlockingQueue<Subproblem> q;
+	private final LinkedBlockingQueue<Subproblem> problemQueue;
 	/**
 	 * Queue to get results from workers.
 	 */
-	private final LinkedBlockingQueue<Perf> qq;
+	private final LinkedBlockingQueue<Perf> resultQueue;
 	/**
 	 * Worker threads.
 	 */
 	private final List<CEWorker> workers;
-	/**
-	 * Current distribution. 
-	 */
-	private GeneralNormalDistribution d;
 	/**
 	 * Sample size per iteration.
 	 */
@@ -48,7 +43,7 @@ public final class CESolver {
 	/**
 	 * Problem considered.
 	 */
-	private CEProblem problem;
+	private Function problem;
 	/**
 	 * RNG used.
 	 */
@@ -77,15 +72,16 @@ public final class CESolver {
 	}
 
 	/**
+	 * Note that all the setters should be called before using the solver.
 	 * @param threads The number of threads to use when solving problems.
 	 * @param r The RNG to use for generating samples.
 	 */
 	public CESolver(int threads, RandomGenerator r) {
-		q = new LinkedBlockingQueue<Subproblem>();
-		qq = new LinkedBlockingQueue<Perf>();
+		problemQueue = new LinkedBlockingQueue<Subproblem>();
+		resultQueue = new LinkedBlockingQueue<Perf>();
 		workers = new ArrayList<CEWorker>();
 		for(int i = 0; i < threads; i++) {
-			workers.add(new CEWorker(q, qq));
+			workers.add(new CEWorker(problemQueue, resultQueue));
 			workers.get(i).start();
 		}
 		this.r = r;
@@ -164,14 +160,14 @@ public final class CESolver {
 	/**
 	 * @return the problem to solve.
 	 */
-	public CEProblem getProblem() {
+	public Function getProblem() {
 		return problem;
 	}
 
 	/**
 	 * @param problem the problem to solve.
 	 */
-	public void setProblem(CEProblem problem) {
+	public void setProblem(Function problem) {
 		this.problem = problem;
 	}
 
@@ -193,53 +189,55 @@ public final class CESolver {
 	}
 
 	/**
-	 * @return The found maximum value.
+	 * @param initial The distribution to start with.
+	 * @return The vector giving the maximal found value.
 	 * @throws InterruptedException In case it is interrupted while working.
 	 */
-	public double[] solve() throws InterruptedException {
+	public double[] solve(Distribution initial) throws InterruptedException {
 		double[] best = null;
-		d = new GeneralNormalDistribution(problem.dimension(), r);
-		int save = elites / 2;
-		double dist;
-		double[] oldMean = d.getMeans();
-		double[] mean;
-		List<Point> params = new ArrayList<Point>();
+		Distribution d = initial;
+		final int save = 1; // Save the best vector found.
+		List<Point> sampleList = new ArrayList<Point>();
 		for(int i = 0; i < samples; i++) {
-			params.add(new Point(d.sample()));
+			sampleList.add(new Point(d.sample()));
 		}
 
-		for(int iter = 1; iter <= maxIterations && d.avgVar() > minVariance; iter++) {
+		for(int iter = 1; iter <= maxIterations && d.getVar() > minVariance; iter++) {
 			for(int i = save; i < samples; i++) {
-				params.set(i, new Point(d.sample()));
+				sampleList.set(i, new Point(d.sample()));
 			}
 			for(int i = 0; i < samples; i++) {
-				q.add(new Subproblem(problem, params.get(i).par, i));
+				problemQueue.add(new Subproblem(problem, sampleList.get(i).vec, i));
 			}
 			for(int i = 0; i < samples; i++) {
-				Perf perf = qq.take();
-				params.get(perf.index).performance = perf.performance;
+				Perf perf = resultQueue.take();
+				sampleList.get(perf.index).performance = perf.performance;
 			}
 
-			Collections.sort(params);
-			double noise = initialNoise + noiseStep * iter;
-			List<Point> eliteSamples = params.subList(0, elites);
-			System.out.println("Standard deviation of scores: " + scoreDeviation(eliteSamples));
-			d.fitTo(eliteSamples, noise > 0 ? noise : 0);
-			mean = d.getMeans();
-			dist = l2(mean, oldMean);
-			oldMean = mean;
-			print(iter, params, dist);
-			best = params.get(0).par;
+			Collections.sort(sampleList);
+			double noise = initialNoise + noiseStep * (iter-1);
+			List<Point> eliteSamples = sampleList.subList(0, elites);
+			d.fitTo(toDoubleArrayArray(eliteSamples), noise > 0 ? noise : 0);
+
+			best = sampleList.get(0).vec;
 		}
 		return best;
 	}
 
+	private static double[][] toDoubleArrayArray(List<Point> list) {
+		double[][] ret = new double[list.size()][];
+		for(int i = 0; i < ret.length; i++) {
+			ret[i] = list.get(i).vec;
+		}
+		return ret;
+	}
+
 	/**
-	 * Evaluates the parameter vector v several times, averaging the results.
-	 * This is useful to test the fitness of a parameter vector
+	 * Evaluates the vector v several times, averaging the results.
+	 * This is useful to test the fitness of a vector
 	 * for a stochastic function.
-	 * @param v the parameter vector to evaluate.
-	 * @param trials the number of trials to do.
+	 * @param v the vector to evaluate.
+	 * @param trials the number of trials to do. At least 2.
 	 * @return the mean and standard deviation of the trials.
 	 * @throws InterruptedException if interrupted.
 	 */
@@ -250,50 +248,16 @@ public final class CESolver {
 		double m = 0;
 		double s = 0;
 		for(int i = 0; i < trials; i++) {
-			q.add(new Subproblem(problem, v, i));
+			problemQueue.add(new Subproblem(problem, v, i));
 		}
 		// see https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
 		for(int i = 1; i <= trials; i++) {
-			perf = qq.take();
+			perf = resultQueue.take();
 			double x = perf.performance;
 			double delta = x - m;
 			m = m + delta / i;
 			s = s + delta * (x - m);
 		}
 		return new EvaluationResult(m, s / (trials - 1));
-	}
-
-	private static double scoreDeviation(List<Point> l) {
-		double mean = 0;
-		for(Point p : l) {
-			mean += p.performance;
-		}
-		mean /= l.size();
-		double var = 0;
-		for(Point p : l) {
-			var += (p.performance - mean) * (p.performance - mean);
-		}
-		return Math.sqrt(var / l.size());
-	}
-
-	private void print(int i, List<Point> params, double dist) {
-		System.out.println("Done with iteration " + i + ": ");
-		for(Point point : params) {
-			System.out.print((int)point.performance + " ");
-		}
-		System.out.println();
-		System.out.println("Mean moved: " + dist);
-		System.out.println("New mean: " + Arrays.toString(d.getMeans()));
-		System.out.println("New variance: " + d.avgVar());
-		System.out.println();
-	}
-
-	// Computes the l2 distance beteen a and b, compensated for length.
-	private static double l2(double[] a, double[] b) {
-		double ans = 0;
-		for(int i = 0; i < a.length; i++) {
-			ans += (a[i] - b[i]) * (a[i] - b[i]);
-		}
-		return Math.sqrt(ans / a.length);
 	}
 }

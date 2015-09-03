@@ -9,17 +9,17 @@ class Point implements Comparable<Point> {
 	/**
 	 * The point.
 	 */
-	double[] par;
+	double[] vec;
 	/**
 	 * A cached measure of performance. 
 	 */
 	double performance;
 
 	/**
-	 * @param params
+	 * @param vector
 	 */
-	Point(double[] params) {
-		par = Arrays.copyOf(params, params.length);
+	Point(double[] vector) {
+		vec = Arrays.copyOf(vector, vector.length);
 	}
 
 	/* (non-Javadoc)
@@ -35,6 +35,6 @@ class Point implements Comparable<Point> {
 	 */
 	@Override
 	public String toString() {
-		return Arrays.toString(par);
+		return Arrays.toString(vec);
 	}
 }

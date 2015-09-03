@@ -1,7 +1,5 @@
 package cemethod;
 
-import java.util.List;
-
 import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.stat.correlation.Covariance;
@@ -12,7 +10,7 @@ import org.apache.commons.math3.stat.correlation.Covariance;
  * matrix. Theoretically, there is no need to have nonsingular matrices but
  * apache commons cannot work with singular covariance matrices.
  */
-class GeneralNormalDistribution {
+public class GeneralNormalDistribution implements Distribution {
 	/**
 	 * The dimensionality of the distribution.
 	 */
@@ -27,59 +25,43 @@ class GeneralNormalDistribution {
 	private final RandomGenerator r;
 
 	/**
-	 * @param dimension the dimensionality of the distribution.
 	 * @param r the source of randomness when sampling.
+	 * @param means the means of the distribution.
+	 * @param var the variance of the distribution.
 	 */
-	public GeneralNormalDistribution(int dimension, RandomGenerator r) {
-		dim = dimension;
-		double[] means = new double[dim];
+	public GeneralNormalDistribution(RandomGenerator r, double[] means, double var) {
+		dim = means.length;
 		double[][] covarianceMatrix = new double[dim][dim];
 		for(int i = 0; i < dim; i++) {
-			means[i] = 0;
-			covarianceMatrix[i][i] = 100;
+			covarianceMatrix[i][i] = var;
 		}
 		this.r = r;
 		d = new MultivariateNormalDistribution(this.r, means, covarianceMatrix);
 	}
 
-	/**
-	 * Fits a new normal distribution to the samples given,
-	 * adding the specified amount of noise. If noise is less than 0.05,
-	 * 0.05 will be used instead to avoid getting a singular covariance matrix.
-	 * @param samples the samples to fit to.
-	 * @param noise the noise to add to the diagonal of the covariance matrix.
-	 */
-	public void fitTo(List<Point> samples, double noise) {
-		int nsamples = samples.size();
+	@Override
+	public void fitTo(double[][] samples, double noise) {
+		int nsamples = samples.length;
 		double[] means = new double[dim];
 		double[][] covarianceMatrix;
-		for(Point sample : samples) {
+		for(double[] sample : samples) {
 			for(int i = 0; i < dim; i++) {
-				means[i] += sample.par[i] / nsamples;
+				means[i] += sample[i] / nsamples;
 			}
 		}
-		double[][] arr = new double[samples.size()][];
-		for(int i = 0; i < samples.size(); i++) {
-			arr[i] = samples.get(i).par;
-		}
-		covarianceMatrix = new Covariance(arr, false).getCovarianceMatrix().getData();
+		covarianceMatrix = new Covariance(samples, false).getCovarianceMatrix().getData();
 		for(int i = 0; i < dim; i++) {
-			covarianceMatrix[i][i] += noise + 0.05;
-		}
-		/*for(double[] a : covarianceMatrix) {
-			for(double f : a) {
-				System.out.printf("%07.5f ", f);
+			if(noise < 0.1) {
+				covarianceMatrix[i][i] += 0.1;
+			} else {
+				covarianceMatrix[i][i] += noise;
 			}
-			System.out.println();
-		}*/
+		}
 		d = new MultivariateNormalDistribution(r, means, covarianceMatrix);
 	}
 
-	/**
-	 * 
-	 * @return The average variance of this distribution.
-	 */
-	public double avgVar() {
+	@Override
+	public double getVar() {
 		double ans = 0;
 		double[] a = d.getStandardDeviations();
 		for(double x : a) {
@@ -88,17 +70,12 @@ class GeneralNormalDistribution {
 		return ans / dim;
 	}
 
-	/**
-	 * @return The means in each dimension (the diagonal of the covariance matrix).
-	 */
+	@Override
 	public double[] getMeans() {
 		return d.getMeans();
 	}
 
-	/**
-	 * 
-	 * @return A sample from the distribution.
-	 */
+	@Override
 	public double[] sample() {
 		return d.sample();
 	}

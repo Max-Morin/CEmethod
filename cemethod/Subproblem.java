@@ -8,7 +8,7 @@ class Subproblem {
 	/**
 	 * problem to use.
 	 */
-	CEProblem problem;
+	Function problem;
 	/**
 	 * parameters to use.
 	 */
@@ -23,7 +23,7 @@ class Subproblem {
 	 * @param params parameter vector to evaluate.
 	 * @param i index of this parameter vector (see CESolver).
 	 */
-	public Subproblem(CEProblem p, double[] params, int i) {
+	public Subproblem(Function p, double[] params, int i) {
 		problem = p;
 		parameters = params;
 		index = i;

@@ -1,8 +1,8 @@
 package cemethod;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+
+import org.apache.commons.math3.random.RandomGenerator;
 
 /**
  * Implements the normal distribution under the assumption that
@@ -10,7 +10,7 @@ import java.util.Random;
  * independent, i.e. the covariance matrix is a multiple of the
  * identity matrix.
  */
-class NormalDistribution {
+public class NormalDistribution implements Distribution {
 	/**
 	 * The dimensionality of the distribution.
 	 */
@@ -22,65 +22,56 @@ class NormalDistribution {
 	/**
 	 * The variance, common to each component of the vector.
 	 */
-	private final double var;
+	private double var;
+	/**
+	 * The RNG used to draw samples from this distribution.
+	 */
+	private final RandomGenerator r;
+
 
 	/**
-	 * @param dimension the dimensionality of the distribution.
 	 * @param var the variance of the distribution.
+	 * @param r the source of randomness when sampling.
+	 * @param mean the mean.
+	 * @param var the variance.
 	 */
-	public NormalDistribution(int dimension, double var) {
-		dim = dimension;
-		means = new double[dim];
-		for(int i = 0; i < dim; i++) {
-			means[i] = 0;
-		}
-		this.var = var;
+	public NormalDistribution(RandomGenerator r, double[] mean, double var) {
+		dim = mean.length;
+		means = mean;
+		this.var = 10;
+		this.r = r;
 	}
 
-	/**
-	 * Fits a new normal distribution to the samples given,
-	 * adding the specified amount of noise.
-	 * @param samples the samples to fit to.
-	 * @param noise the noise to add to the variance.
-	 */
-	public NormalDistribution(List<Point> samples, double noise) {
-		dim = samples.get(0).par.length;
-		means = new double[dim];
-		int nsamples = samples.size();
-		for(Point sample : samples) {
+	@Override
+	public void fitTo(double[][] samples, double noise) {
+		int nsamples = samples.length;
+		for(double[] sample : samples) {
 			for(int i = 0; i < dim; i++) {
-				means[i] += sample.par[i] / nsamples;
+				means[i] += sample[i] / nsamples;
 			}
 		}
 		double nvar = 0;
-		for(Point sample : samples) {
+		for(double[] sample : samples) {
 			for(int i = 0; i < dim; i++) {
-				double si = sample.par[i];
+				double si = sample[i];
 				nvar += (si - means[i]) * (si - means[i]);
 			}
 		}
 		var = nvar / nsamples / dim + noise;
 	}
 
-	/**
-	 * @return the variance of this distribution.
-	 */
+	@Override
 	public double getVar() {
 		return var;
 	}
 
-	/**
-	 * @return means of this distribution.
-	 */
-	public double[] getMean() {
+	@Override
+	public double[] getMeans() {
 		return Arrays.copyOf(means, dim);
 	}
 
-	/**
-	 * @param r the source of randomness.
-	 * @return a sample from this distribution.
-	 */
-	public double[] sample(Random r) {
+	@Override
+	public double[] sample() {
 		double[] ret = new double[dim];
 		for(int i = 0; i < dim; i++) {
 			ret[i] = means[i] + r.nextGaussian() * Math.sqrt(var);
