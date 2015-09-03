@@ -53,15 +53,15 @@ public class Main {
 		int dimension = 100;
 		Function ack = new Ackley(dimension);
 		int threads = 8;
-		int maxIterations = 1000;
+		int maxIterations = 200;
 		double minVariance = 0;
-		double initialNoise = 9;
-		double noiseStep = -0.01;
-		int sampleSize = 1000;
-		int elitesSize = 50;
+		double initialNoise = 6;
+		double noiseStep = -0.1;
+		int sampleSize = 200;
+		int elitesSize = 15;
 		double[] initialGuess = new double[dimension];
 		for(int i = 0; i < dimension; i++) {
-			// We do not simply make out initial guess 0,
+			// We do not simply make our initial guess 0,
 			// since that is the optimum (no cheating). 
 			initialGuess[i] = 10 - 20*r.nextDouble();
 		}
@@ -77,7 +77,7 @@ public class Main {
 		solver.setInitialNoise(initialNoise);
 		solver.setNoiseStep(noiseStep);
 		try {
-			double[] v = solver.solve(new GeneralNormalDistribution(r, initialGuess, initialVariance));
+			double[] v = solver.solve(new NormalDistribution(r, initialGuess, initialVariance));
 			System.out.println("perf: " + ack.fitness(v));
 		} catch(InterruptedException e) {
 			System.exit(1);

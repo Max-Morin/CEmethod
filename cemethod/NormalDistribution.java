@@ -30,21 +30,23 @@ public class NormalDistribution implements Distribution {
 
 
 	/**
-	 * @param var the variance of the distribution.
 	 * @param r the source of randomness when sampling.
 	 * @param mean the mean.
-	 * @param var the variance.
+	 * @param var the variance of the distribution.
 	 */
 	public NormalDistribution(RandomGenerator r, double[] mean, double var) {
 		dim = mean.length;
 		means = mean;
-		this.var = 10;
+		this.var = var;
 		this.r = r;
 	}
 
 	@Override
 	public void fitTo(double[][] samples, double noise) {
 		int nsamples = samples.length;
+		for(int i = 0; i < dim; i++) {
+			means[i] = 0;
+		}
 		for(double[] sample : samples) {
 			for(int i = 0; i < dim; i++) {
 				means[i] += sample[i] / nsamples;

@@ -9,6 +9,8 @@ import org.apache.commons.math3.stat.correlation.Covariance;
  * A normal distribution where the covariance matrix may be any nonsingular
  * matrix. Theoretically, there is no need to have nonsingular matrices but
  * apache commons cannot work with singular covariance matrices.
+ * This distribution is only appropriate to use if the dimension of the
+ * problem is greater than the number of elite samples used.
  */
 public class GeneralNormalDistribution implements Distribution {
 	/**
@@ -51,11 +53,7 @@ public class GeneralNormalDistribution implements Distribution {
 		}
 		covarianceMatrix = new Covariance(samples, false).getCovarianceMatrix().getData();
 		for(int i = 0; i < dim; i++) {
-			if(noise < 0.1) {
-				covarianceMatrix[i][i] += 0.1;
-			} else {
-				covarianceMatrix[i][i] += noise;
-			}
+			covarianceMatrix[i][i] += noise;
 		}
 		d = new MultivariateNormalDistribution(r, means, covarianceMatrix);
 	}

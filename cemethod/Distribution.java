@@ -23,7 +23,6 @@ public interface Distribution {
 	double[] getMeans();
 
 	/**
-	 * @param r the source of randomness.
 	 * @return a sample from this distribution.
 	 */
 	double[] sample();

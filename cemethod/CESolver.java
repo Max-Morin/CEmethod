@@ -218,6 +218,10 @@ public final class CESolver {
 			double noise = initialNoise + noiseStep * (iter-1);
 			List<Point> eliteSamples = sampleList.subList(0, elites);
 			d.fitTo(toDoubleArrayArray(eliteSamples), noise > 0 ? noise : 0);
+			if(Double.isNaN(d.getVar())) {
+				System.out.println("NaN Value found.");
+				return best;
+			}
 
 			best = sampleList.get(0).vec;
 		}
