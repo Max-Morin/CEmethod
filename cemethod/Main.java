@@ -30,11 +30,10 @@ public class Main {
 			double s1 = 0;
 			double s2 = 0;
 			for(int i = 0; i < v.length; i++) {
-				s1 += v[i]*v[i];
-				s2 += Math.cos(2*Math.PI*v[i]);
+				s1 += v[i] * v[i];
+				s2 += Math.cos(2 * Math.PI * v[i]);
 			}
-			return 20*Math.exp(-0.2*Math.sqrt(s1/dim))+
-				Math.exp(s2/dim)-Math.E-20;
+			return 20 * Math.exp(-0.2 * Math.sqrt(s1 / dim)) + Math.exp(s2 / dim) - Math.E - 20;
 		}
 	}
 
@@ -63,7 +62,7 @@ public class Main {
 		for(int i = 0; i < dimension; i++) {
 			// We do not simply make our initial guess 0,
 			// since that is the optimum (no cheating). 
-			initialGuess[i] = 10 - 20*r.nextDouble();
+			initialGuess[i] = 10 - 20 * r.nextDouble();
 		}
 		double initialVariance = 30;
 

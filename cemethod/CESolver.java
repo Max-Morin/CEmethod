@@ -56,6 +56,99 @@ public final class CESolver {
 	 * Noise added first iteration.
 	 */
 	private double initialNoise;
+	/**
+	 * Amount of debug information to show.
+	 */
+	private int verbosity;
+
+	/**
+	 * Shuts down all threads used by this solver.
+	 */
+	public void shutdown() {
+		for(CEWorker w : workers) {
+			w.interrupt();
+		}
+	}
+
+	/**
+	 * @param initial The distribution to start with.
+	 * @return The vector giving the maximal found value.
+	 * @throws InterruptedException In case it is interrupted while working.
+	 */
+	public double[] solve(Distribution initial) throws InterruptedException {
+		double[] best = null;
+		Distribution d = initial;
+		final int save = 1; // Save the best vector found. Values > 1 can also be tried.
+		List<Point> sampleList = new ArrayList<Point>();
+		for(int i = 0; i < samples; i++) {
+			sampleList.add(new Point(d.sample()));
+		}
+
+		for(int iter = 1; iter <= maxIterations && d.getVar() > minVariance; iter++) {
+			for(int i = save; i < samples; i++) {
+				sampleList.set(i, new Point(d.sample()));
+			}
+			for(int i = 0; i < samples; i++) {
+				problemQueue.add(new Subproblem(problem, sampleList.get(i).vec, i));
+			}
+			for(int i = 0; i < samples; i++) {
+				Perf perf = resultQueue.take();
+				sampleList.get(perf.index).performance = perf.performance;
+			}
+
+			Collections.sort(sampleList);
+			double noise = initialNoise + noiseStep * (iter - 1);
+			List<Point> eliteSamples = sampleList.subList(0, elites);
+			d.fitTo(toDoubleArrayArray(eliteSamples), noise > 0 ? noise : 0);
+			best = sampleList.get(0).vec;
+			if(verbosity > 0) {
+				System.out.println("Done with iteration " + iter);
+				System.out.println("Performance of samples this iteration:");
+				for(int i = 0; i < samples-1; i++) {
+					System.out.printf("%.2e ", sampleList.get(i).performance);
+				}
+				System.out.printf("%.2e\n", sampleList.get(samples-1).performance);
+			}
+		}
+		return best;
+	}
+
+	private static double[][] toDoubleArrayArray(List<Point> list) {
+		double[][] ret = new double[list.size()][];
+		for(int i = 0; i < ret.length; i++) {
+			ret[i] = list.get(i).vec;
+		}
+		return ret;
+	}
+
+	/**
+	 * Evaluates the vector v several times, averaging the results.
+	 * This is useful to test the fitness of a vector
+	 * for a stochastic function.
+	 * @param v the vector to evaluate.
+	 * @param trials the number of trials to do. At least 2.
+	 * @return the mean and standard deviation of the trials.
+	 * @throws InterruptedException if interrupted.
+	 */
+	public EvaluationResult evaluateParameters(double[] v, int trials) throws InterruptedException {
+		if(trials < 2) { throw new IllegalArgumentException(
+			"Must run at least two trials to compute sample standard deviation."); }
+		Perf perf;
+		double m = 0;
+		double s = 0;
+		for(int i = 0; i < trials; i++) {
+			problemQueue.add(new Subproblem(problem, v, i));
+		}
+		// see https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+		for(int i = 1; i <= trials; i++) {
+			perf = resultQueue.take();
+			double x = perf.performance;
+			double delta = x - m;
+			m = m + delta / i;
+			s = s + delta * (x - m);
+		}
+		return new EvaluationResult(m, s / (trials - 1));
+	}
 
 	/**
 	 * @return the maxIterations
@@ -172,96 +265,24 @@ public final class CESolver {
 	}
 
 	/**
+	 * @return the verbosity
+	 */
+	public int getVerbosity() {
+		return verbosity;
+	}
+
+	/**
+	 * @param verbosity 1 for progress updates, 0 for silent execution.
+	 */
+	public void setVerbosity(int verbosity) {
+		this.verbosity = verbosity;
+	}
+
+	/**
 	 * Useful with threads = 1 for deterministic execution.
 	 * @param n the seed for the RNG.
 	 */
 	public void seed(long n) {
 		r.setSeed(n);
-	}
-
-	/**
-	 * Shuts down all threads used by this solver.
-	 */
-	public void shutdown() {
-		for(CEWorker w : workers) {
-			w.interrupt();
-		}
-	}
-
-	/**
-	 * @param initial The distribution to start with.
-	 * @return The vector giving the maximal found value.
-	 * @throws InterruptedException In case it is interrupted while working.
-	 */
-	public double[] solve(Distribution initial) throws InterruptedException {
-		double[] best = null;
-		Distribution d = initial;
-		final int save = 1; // Save the best vector found.
-		List<Point> sampleList = new ArrayList<Point>();
-		for(int i = 0; i < samples; i++) {
-			sampleList.add(new Point(d.sample()));
-		}
-
-		for(int iter = 1; iter <= maxIterations && d.getVar() > minVariance; iter++) {
-			for(int i = save; i < samples; i++) {
-				sampleList.set(i, new Point(d.sample()));
-			}
-			for(int i = 0; i < samples; i++) {
-				problemQueue.add(new Subproblem(problem, sampleList.get(i).vec, i));
-			}
-			for(int i = 0; i < samples; i++) {
-				Perf perf = resultQueue.take();
-				sampleList.get(perf.index).performance = perf.performance;
-			}
-
-			Collections.sort(sampleList);
-			double noise = initialNoise + noiseStep * (iter-1);
-			List<Point> eliteSamples = sampleList.subList(0, elites);
-			d.fitTo(toDoubleArrayArray(eliteSamples), noise > 0 ? noise : 0);
-			if(Double.isNaN(d.getVar())) {
-				System.out.println("NaN Value found.");
-				return best;
-			}
-
-			best = sampleList.get(0).vec;
-		}
-		return best;
-	}
-
-	private static double[][] toDoubleArrayArray(List<Point> list) {
-		double[][] ret = new double[list.size()][];
-		for(int i = 0; i < ret.length; i++) {
-			ret[i] = list.get(i).vec;
-		}
-		return ret;
-	}
-
-	/**
-	 * Evaluates the vector v several times, averaging the results.
-	 * This is useful to test the fitness of a vector
-	 * for a stochastic function.
-	 * @param v the vector to evaluate.
-	 * @param trials the number of trials to do. At least 2.
-	 * @return the mean and standard deviation of the trials.
-	 * @throws InterruptedException if interrupted.
-	 */
-	public EvaluationResult evaluateParameters(double[] v, int trials) throws InterruptedException {
-		if(trials < 2) { throw new IllegalArgumentException(
-			"Must run at least two trials to compute sample standard deviation."); }
-		Perf perf;
-		double m = 0;
-		double s = 0;
-		for(int i = 0; i < trials; i++) {
-			problemQueue.add(new Subproblem(problem, v, i));
-		}
-		// see https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
-		for(int i = 1; i <= trials; i++) {
-			perf = resultQueue.take();
-			double x = perf.performance;
-			double delta = x - m;
-			m = m + delta / i;
-			s = s + delta * (x - m);
-		}
-		return new EvaluationResult(m, s / (trials - 1));
 	}
 }

@@ -28,7 +28,6 @@ public class NormalDistribution implements Distribution {
 	 */
 	private final RandomGenerator r;
 
-
 	/**
 	 * @param r the source of randomness when sampling.
 	 * @param mean the mean.
